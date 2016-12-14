@@ -6,7 +6,7 @@ author: mcardosos
 
 #Azure Virtual Machine Management Sample using Azure SDK for Go
 
-This package demonstrates how to manage your Azure virtual machine (VM) using Go, and specifically how to:
+This sample demonstrates how to manage your Azure virtual machine (VM) using Go, and specifically how to:
 - Create a virtual machine
 - Tag a virtual machine
 - Attach and detach data disks
@@ -26,11 +26,11 @@ If you don't have a Microsoft Azure subscription you can get a FREE trial accoun
 <a id="run"></a>
 ## Run this sample
 
-1. Create a [service principal](https://azure.microsoft.com/documentation/articles/resource-group-authenticate-service-principal-cli/). You will need the Tenant ID, Client ID and Client Secret for [authentication](https://github.com/Azure/azure-sdk-for-go/tree/master/arm#first-a-sidenote-authentication-and-the-azure-resource-manager), so keep them as soon as you get them.
+1. Create an Azure [service principal](https://azure.microsoft.com/documentation/articles/resource-group-authenticate-service-principal-cli/). You will need the Tenant ID, Client ID and Client Secret for authentication, so keep them as soon as you get them.
 2. Get your Azure Subscription ID using either of the methods mentioned below:
   - Get it through the [portal](portal.azure.com) in the subscriptions section.
   - Get it using the [Azure CLI](https://azure.microsoft.com/documentation/articles/xplat-cli-install/) with command `azure account show`.
-  - Get it using [Azure Powershell](https://azure.microsoft.com/documentation/articles/powershell-install-configure/) whit cmdlet `Get-AzureRmSubscription`.
+  - Get it using [Azure Powershell](https://azure.microsoft.com/documentation/articles/powershell-install-configure/) whit command `Get-AzureRmSubscription`.
 3. Set environment variables `AZURE_TENANT_ID = <TENANT_ID>`, `AZURE_CLIENT_ID = <CLIENT_ID>`, `AZURE_CLIENT_SECRET = <CLIENT_SECRET>` and `AZURE_SUBSCRIPTION_ID = <SUBSCRIPTION_ID>`.
 4. Get this sample using command `go get -u github.com/Azure-Samples/compute-go-manage-vm`.
 5. Get the [Azure SDK for Go](https://github.com/Azure/azure-sdk-for-go) using command `go get -u github.com/Azure/azure-sdk-for-go`. Or in case that you want to vendor your dependencies using [glide](https://github.com/Masterminds/glide), navigate to this sample's directory and use command `glide install`.
@@ -39,7 +39,7 @@ If you don't have a Microsoft Azure subscription you can get a FREE trial accoun
 <a id="sample"></a>
 ## What does VMsample.go do?
 
-First, all resources needed before creating a VM are created (resource group, storage account, virtual network, subnet)
+First, it creates all resources needed before creating a VM (resource group, storage account, virtual network, subnet)
 
 ### Create a Linux VM
 
@@ -134,9 +134,9 @@ _, err = vmClient.Delete(resourceGroupName, windowsVMname, nil)
 <a id="info"></a>
 ## More information
 
-- [First a Sidenote: Authentication and the Azure Resource Manager](https://github.com/Azure/azure-sdk-for-go/tree/master/arm#first-a-sidenote-authentication-and-the-azure-resource-manager)
-- [Azure Virtual Machines documentation](https://azure.microsoft.com/services/virtual-machines/)
-- [Learning Path for Virtual Machines](https://azure.microsoft.com/documentation/learning-paths/virtual-machines/)
+- [Running Go Applications on Azure App Service](https://azure.microsoft.com/blog/running-go-applications-on-azure-app-service/)
+- [Windows Virtual Machines documentation](https://azure.microsoft.com/documentation/services/virtual-machines/windows/)
+- [Linux Virtual Machines documentation](https://azure.microsoft.com/documentation/services/virtual-machines/linux/)
 
 ***
 
