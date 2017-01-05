@@ -171,7 +171,6 @@ _, err = groupClient.Delete(groupName, nil)
 
 ## More information
 
-- [Running Go Applications on Azure App Service](https://azure.microsoft.com/blog/running-go-applications-on-azure-app-service/)
 - [Windows Virtual Machines documentation](https://azure.microsoft.com/documentation/services/virtual-machines/windows/)
 - [Linux Virtual Machines documentation](https://azure.microsoft.com/documentation/services/virtual-machines/linux/)
 
