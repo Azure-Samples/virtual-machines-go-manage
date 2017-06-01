@@ -6,10 +6,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/Azure/azure-sdk-for-go/arm/network"
-	"github.com/Azure/azure-sdk-for-go/arm/resources/resources"
-	"github.com/Azure/azure-sdk-for-go/arm/storage"
+	"github.com/Azure/azure-sdk-for-go/arm/compute/2017-03-30/compute"
+	"github.com/Azure/azure-sdk-for-go/arm/network/2016-03-30/network"
+	"github.com/Azure/azure-sdk-for-go/arm/resources/resources/2017-05-10/resources"
+	"github.com/Azure/azure-sdk-for-go/arm/storage/2016-01-01/storage"
+	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -31,7 +33,7 @@ const (
 var (
 	groupName   = "your-azure-sample-group"
 	accountName = "golangrocksonazure"
-	location    = "westus"
+	location    = "westus2"
 
 	groupClient      resources.GroupsClient
 	accountClient    storage.AccountsClient
@@ -46,12 +48,12 @@ func init() {
 	subscriptionID := getEnvVarOrExit("AZURE_SUBSCRIPTION_ID")
 	tenantID := getEnvVarOrExit("AZURE_TENANT_ID")
 
-	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(tenantID)
+	oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, tenantID)
 	onErrorFail(err, "OAuthConfigForTenant failed")
 
 	clientID := getEnvVarOrExit("AZURE_CLIENT_ID")
 	clientSecret := getEnvVarOrExit("AZURE_CLIENT_SECRET")
-	spToken, err := azure.NewServicePrincipalToken(*oauthConfig, clientID, clientSecret, azure.PublicCloud.ResourceManagerEndpoint)
+	spToken, err := adal.NewServicePrincipalToken(*oauthConfig, clientID, clientSecret, azure.PublicCloud.ResourceManagerEndpoint)
 	onErrorFail(err, "NewServicePrincipalToken failed")
 
 	createClients(subscriptionID, spToken)
@@ -84,7 +86,8 @@ func main() {
 	deleteVM(windowsVMname)
 
 	fmt.Println("Delete resource group...")
-	_, err = groupClient.Delete(groupName, nil)
+	_, errChan := groupClient.Delete(groupName, nil)
+	err = <-errChan
 	onErrorFail(err, "Delete failed")
 }
 
@@ -92,7 +95,7 @@ func main() {
 func createNeededResources() (*network.Subnet, error) {
 	fmt.Println("Create needed resources")
 	fmt.Println("\tCreate resource group...")
-	resourceGroupParameters := resources.ResourceGroup{
+	resourceGroupParameters := resources.Group{
 		Location: &location,
 	}
 	if _, err := groupClient.CreateOrUpdate(groupName, resourceGroupParameters); err != nil {
@@ -107,7 +110,9 @@ func createNeededResources() (*network.Subnet, error) {
 		Location: &location,
 		AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{},
 	}
-	if _, err := accountClient.Create(groupName, accountName, accountParameters, nil); err != nil {
+
+	_, errChan := accountClient.Create(groupName, accountName, accountParameters, nil)
+	if err := <-errChan; err != nil {
 		return nil, err
 	}
 
@@ -121,7 +126,8 @@ func createNeededResources() (*network.Subnet, error) {
 			},
 		},
 	}
-	if _, err := vNetClient.CreateOrUpdate(groupName, vNetName, vNetParameters, nil); err != nil {
+	_, errChan = vNetClient.CreateOrUpdate(groupName, vNetName, vNetParameters, nil)
+	if err := <-errChan; err != nil {
 		return nil, err
 	}
 
@@ -132,7 +138,8 @@ func createNeededResources() (*network.Subnet, error) {
 			AddressPrefix: to.StringPtr("10.0.0.0/24"),
 		},
 	}
-	if _, err := subnetClient.CreateOrUpdate(groupName, vNetName, subnetName, subnet, nil); err != nil {
+	_, errChan = subnetClient.CreateOrUpdate(groupName, vNetName, subnetName, subnet, nil)
+	if err := <-errChan; err != nil {
 		return nil, err
 	}
 
@@ -154,7 +161,8 @@ func createVM(vmName, publisher, offer, sku string, subnetInfo *network.Subnet) 
 
 	fmt.Printf("Create '%s' VM...\n", vmName)
 	vm := setVMparameters(vmName, publisher, offer, sku, *nicParameters.ID)
-	if _, err := vmClient.CreateOrUpdate(groupName, vmName, vm, nil); err != nil {
+	_, errChan := vmClient.CreateOrUpdate(groupName, vmName, vm, nil)
+	if err := <-errChan; err != nil {
 		return err
 	}
 
@@ -181,7 +189,9 @@ func createPIPandNIC(machine string, subnetInfo *network.Subnet) (*network.Publi
 			},
 		},
 	}
-	if _, err := addressClient.CreateOrUpdate(groupName, IPname, pipParameters, nil); err != nil {
+
+	_, errChan := addressClient.CreateOrUpdate(groupName, IPname, pipParameters, nil)
+	if err := <-errChan; err != nil {
 		return nil, nil, err
 	}
 
@@ -208,7 +218,9 @@ func createPIPandNIC(machine string, subnetInfo *network.Subnet) (*network.Publi
 			},
 		},
 	}
-	if _, err := interfacesClient.CreateOrUpdate(groupName, nicName, nicParameters, nil); err != nil {
+
+	_, errChan = interfacesClient.CreateOrUpdate(groupName, nicName, nicParameters, nil)
+	if err := <-errChan; err != nil {
 		return &publicIPaddress, nil, err
 	}
 
@@ -227,7 +239,7 @@ func setVMparameters(vmName, publisher, offer, sku, nicID string) compute.Virtua
 		Location: &location,
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			HardwareProfile: &compute.HardwareProfile{
-				VMSize: compute.StandardDS1,
+				VMSize: compute.StandardDS1V2,
 			},
 			StorageProfile: &compute.StorageProfile{
 				ImageReference: &compute.ImageReference{
@@ -297,8 +309,8 @@ func updateVM(vmName string, vm *compute.VirtualMachine) {
 		"who rocks": to.StringPtr("golang"),
 		"where":     to.StringPtr("on azure"),
 	})
-	_, err := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
-	onErrorFail(err, "CreateOrUpdate failed")
+	_, errChan := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
+	onErrorFail(<-errChan, "CreateOrUpdate failed")
 }
 
 func attachDataDisk(vmName string, vm *compute.VirtualMachine) {
@@ -314,15 +326,15 @@ func attachDataDisk(vmName string, vm *compute.VirtualMachine) {
 			DiskSizeGB:   to.Int32Ptr(1),
 		},
 	}
-	_, err := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
-	onErrorFail(err, "CreateOrUpdate failed")
+	_, errChan := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
+	onErrorFail(<-errChan, "CreateOrUpdate failed")
 }
 
 func detachDataDisks(vmName string, vm *compute.VirtualMachine) {
 	fmt.Println("Detach data disks (via CreateOrUpdate operation)")
 	vm.StorageProfile.DataDisks = &[]compute.DataDisk{}
-	_, err := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
-	onErrorFail(err, "CreateOrUpdate failed")
+	_, errChan := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
+	onErrorFail(<-errChan, "CreateOrUpdate failed")
 }
 
 func updateOSdiskSize(vmName string, vm *compute.VirtualMachine) {
@@ -330,32 +342,32 @@ func updateOSdiskSize(vmName string, vm *compute.VirtualMachine) {
 	if vm.StorageProfile.OsDisk.DiskSizeGB == nil {
 		vm.StorageProfile.OsDisk.DiskSizeGB = to.Int32Ptr(0)
 	}
-	_, err := vmClient.Deallocate(groupName, vmName, nil)
-	onErrorFail(err, "Deallocate failed")
+	_, errChan := vmClient.Deallocate(groupName, vmName, nil)
+	onErrorFail(<-errChan, "Deallocate failed")
 	if *vm.StorageProfile.OsDisk.DiskSizeGB <= 0 {
 		*vm.StorageProfile.OsDisk.DiskSizeGB = 256
 	}
 	*vm.StorageProfile.OsDisk.DiskSizeGB += 10
-	_, err = vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
-	onErrorFail(err, "CreateOrUpdate failed")
+	_, errChan = vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
+	onErrorFail(<-errChan, "CreateOrUpdate failed")
 }
 
 func startVM(vmName string) {
 	fmt.Println("Start VM...")
-	_, err := vmClient.Start(groupName, vmName, nil)
-	onErrorFail(err, "Start failed")
+	_, errChan := vmClient.Start(groupName, vmName, nil)
+	onErrorFail(<-errChan, "Start failed")
 }
 
 func restartVM(vmName string) {
 	fmt.Println("Restart VM...")
-	_, err := vmClient.Restart(groupName, vmName, nil)
-	onErrorFail(err, "Restart failed")
+	_, errChan := vmClient.Restart(groupName, vmName, nil)
+	onErrorFail(<-errChan, "Restart failed")
 }
 
 func stopVM(vmName string) {
 	fmt.Println("Stop VM...")
-	_, err := vmClient.PowerOff(groupName, vmName, nil)
-	onErrorFail(err, "Stop failed")
+	_, errChan := vmClient.PowerOff(groupName, vmName, nil)
+	onErrorFail(<-errChan, "Stop failed")
 }
 
 func listVMs() {
@@ -374,8 +386,8 @@ func listVMs() {
 
 func deleteVM(vmName string) {
 	fmt.Printf("Delete '%s' virtual machine...\n", vmName)
-	_, err := vmClient.Delete(groupName, vmName, nil)
-	onErrorFail(err, "Delete failed")
+	_, errChan := vmClient.Delete(groupName, vmName, nil)
+	onErrorFail(<-errChan, "Delete failed")
 }
 
 // printVM prints basic info about a Virtual Machine.
@@ -418,25 +430,27 @@ func onErrorFail(err error, message string) {
 	}
 }
 
-func createClients(subscriptionID string, spToken *azure.ServicePrincipalToken) {
+func createClients(subscriptionID string, spToken *adal.ServicePrincipalToken) {
+	authorizer := autorest.NewBearerAuthorizer(spToken)
+
 	groupClient = resources.NewGroupsClient(subscriptionID)
-	groupClient.Authorizer = spToken
+	groupClient.Authorizer = authorizer
 
 	accountClient = storage.NewAccountsClient(subscriptionID)
-	accountClient.Authorizer = spToken
+	accountClient.Authorizer = authorizer
 
 	vNetClient = network.NewVirtualNetworksClient(subscriptionID)
-	vNetClient.Authorizer = spToken
+	vNetClient.Authorizer = authorizer
 
 	subnetClient = network.NewSubnetsClient(subscriptionID)
-	subnetClient.Authorizer = spToken
+	subnetClient.Authorizer = authorizer
 
 	addressClient = network.NewPublicIPAddressesClient(subscriptionID)
-	addressClient.Authorizer = spToken
+	addressClient.Authorizer = authorizer
 
 	interfacesClient = network.NewInterfacesClient(subscriptionID)
-	interfacesClient.Authorizer = spToken
+	interfacesClient.Authorizer = authorizer
 
 	vmClient = compute.NewVirtualMachinesClient(subscriptionID)
-	vmClient.Authorizer = spToken
+	vmClient.Authorizer = authorizer
 }
