@@ -71,12 +71,12 @@ If you don't have a Microsoft Azure subscription you can get a FREE trial accoun
 
 First, it creates all resources needed before creating a VM (resource group, storage account, virtual network, subnet)
 
-### Create a Linux VM
+### Create a VM
 
 ```go
-publicIPaddress, nicParameters, err := createPIPandNIC(linuxVMname, subnetInfo)
-vm := setVMparameters(linuxVMname, "Canonical", "UbuntuServer", "16.04.0-LTS", *nicParameters.ID)
-vmClient.CreateOrUpdate(groupName, linuxVMname, vm, nil)
+publicIPaddress, nicParameters := createPIPandNIC(vmName, subnetInfo)
+vm := setVMparameters(vmName, "Canonical", "UbuntuServer", "16.04.0-LTS", *nicParameters.ID)
+_, errChan := vmClient.CreateOrUpdate(groupName, vmName, vm, nil)
 ```
 
 ### Get the VM properties
@@ -92,7 +92,7 @@ vm.Tags = &(map[string]*string{
 	"who rocks": to.StringPtr("golang"),
 	"where":     to.StringPtr("on azure"),
 	})
-_, err := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
+_, errChan := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
 ```
 
 ### Attach data disks to the VM
@@ -105,18 +105,18 @@ _, err := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
 			Vhd: &compute.VirtualHardDisk{
 				URI: to.StringPtr(fmt.Sprintf(vhdURItemplate, accountName, fmt.Sprintf("dataDisks-%v", vmName))),
 			},
-			CreateOption: compute.Empty,
+			CreateOption: compute.DiskCreateOptionTypesEmpty,
 			DiskSizeGB:   to.Int32Ptr(1),
 		},
 	}
-	_, err := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
+	_, errChan := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
 ```
 
 ### Detach data disks
 
-```go 
+```go
 vm.StorageProfile.DataDisks = &[]compute.DataDisk{}
-_, err := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
+_, errChan := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
 ```
 
 ### Updates the VM's OS disk size
@@ -125,31 +125,20 @@ _, err := vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
 if vm.StorageProfile.OsDisk.DiskSizeGB == nil {
 	vm.StorageProfile.OsDisk.DiskSizeGB = to.Int32Ptr(0)
 }
-_, err := vmClient.Deallocate(groupName, vmName, nil)
+_, errChan := vmClient.Deallocate(groupName, vmName, nil)
 if *vm.StorageProfile.OsDisk.DiskSizeGB <= 0 {
 	*vm.StorageProfile.OsDisk.DiskSizeGB = 256
 }
 *vm.StorageProfile.OsDisk.DiskSizeGB += 10
-_, err = vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
+_, errChan = vmClient.CreateOrUpdate(groupName, vmName, *vm, nil)
 ```
 
 ### Starts, restarts and stops the VM
 
 ```go
-_, err = vmClient.Start(groupName, vmName, nil)
-_, err = vmClient.Restart(groupName, vmName, nil)
-_, err = vmClient.PowerOff(groupName, vmName, nil)
-
-```
-
-# Creates a Windows VM
-
-```go
-publicIPaddress, nicParameters, err := createPIPandNIC(windowsVMname, subnetInfo)
-vm := setVMparameters(windowsVMname, "MicrosoftWindowsServerEssentials", "WindowsServerEssentials", "WindowsServerEssentials", *nicParameters.ID)
-if _, err := vmClient.CreateOrUpdate(groupName, windowsVMname, vm, nil); err != nil {
-	return err
-}
+_, errChan := vmClient.Start(groupName, vmName, nil)
+_, errChan = vmClient.Restart(groupName, vmName, nil)
+_, errChan = vmClient.PowerOff(groupName, vmName, nil)
 ```
 
 # Lists all the VMs in your subscription.
@@ -161,10 +150,10 @@ vmList, err := vmClient.ListAll()
 ### Delete the VMs and other resources
 
 ```go
-_, err = vmClient.Delete(groupName, linuxVMname, nil)
-_, err = vmClient.Delete(groupName, windowsVMname, nil)
+_, errChan := vmClient.Delete(groupName, linuxVMname, nil)
+_, errChan = vmClient.Delete(groupName, windowsVMname, nil)
 
-_, err = groupClient.Delete(groupName, nil)
+_, errChan = groupClient.Delete(groupName, nil)
 ```
 
 <a id="info"></a>
